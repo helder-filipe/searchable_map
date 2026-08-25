@@ -22,6 +22,7 @@
     .btn-copy { background: #17a2b8; }
     .btn-import { background: #ffc107; color: #000; }
     .btn-undo { background: #dc3545; }
+    .btn-gmaps { background: #ea4335; }
     .btn-zoom { background: #6c757d; width: 36px; text-align: center; }
 
     .toggle-container {
@@ -38,7 +39,7 @@
     .main-layout { display: flex; flex-grow: 1; overflow: hidden; }
 
     sidebar {
-      width: 320px;
+      width: 340px;
       background: #111;
       border-right: 1px solid #333;
       display: flex;
@@ -93,6 +94,26 @@
       text-decoration: line-through;
     }
 
+    .item-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .gmaps-link {
+      color: #ea4335;
+      text-decoration: none;
+      font-size: 12px;
+      padding: 2px 4px;
+      border: 1px solid #ea4335;
+      border-radius: 3px;
+    }
+
+    .gmaps-link:hover {
+      background: #ea4335;
+      color: #fff;
+    }
+
     .coords-badge {
       font-size: 11px;
       background: #222;
@@ -119,10 +140,12 @@
       left: 0;
       transform-origin: 0 0;
       display: inline-block; 
+      transition: transform 0.2s ease-out;
     }
     
     svg { display: block; }
 
+    /* Marcadores Verdes Padrão */
     .pin {
       position: absolute;
       width: 2px;
@@ -132,6 +155,7 @@
       border-radius: 50%;
       transform: translate(-50%, -50%);
       pointer-events: none;
+      z-index: 10;
     }
 
     .pin-label {
@@ -146,6 +170,59 @@
       white-space: nowrap;
     }
 
+    /* Marcador Vermelho de Destaque da Pesquisa (Pequeno e Independente) */
+    .search-pin {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      background: #ff0055;
+      border: 1px solid #ffffff;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 999;
+      box-shadow: 0 0 6px rgba(255, 0, 85, 0.9);
+      animation: pulseOnce 1s ease-out 1 forwards;
+    }
+
+    .search-pin-label {
+      position: absolute;
+      left: 7px;
+      top: -7px;
+      background: #ff0055;
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: bold;
+      padding: 2px 5px;
+      border-radius: 3px;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    }
+
+    .close-pin-btn {
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 11px;
+      line-height: 1;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 1px 3px;
+      border-radius: 50%;
+    }
+
+    .close-pin-btn:hover {
+      background: #000;
+      color: #ff0055;
+    }
+
+    @keyframes pulseOnce {
+      0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0.2; }
+      50% { transform: translate(-50%, -50%) scale(1.6); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
+
+    /* Oculta apenas os marcadores verdes */
     .hidden-pins .pin {
       display: none !important;
     }
@@ -161,9 +238,10 @@
     
     <label class="toggle-container">
       <input type="checkbox" id="toggle-pins" checked />
-      <span>Mostrar Marcadores</span>
+      <span>Mostrar Marcadores Verdes</span>
     </label>
 
+    <button id="gmaps-btn" class="btn btn-gmaps" title="Ver moradia selecionada no Google Maps">Ver no Google Maps 📍</button>
     <button id="undo-btn" class="btn btn-undo">Desfazer (Ctrl+Z)</button>
     <button id="copy-btn" class="btn btn-copy">Exportar JSON</button>
     <button id="import-btn" class="btn btn-import">Importar JSON</button>
@@ -2886,6 +2964,7 @@
     const importBtn = document.getElementById('import-btn');
     const fileInput = document.getElementById('file-input');
     const undoBtn = document.getElementById('undo-btn');
+    const gmapsBtn = document.getElementById('gmaps-btn');
     const searchBox = document.getElementById('search-box');
     const togglePinsBtn = document.getElementById('toggle-pins');
 
@@ -2937,6 +3016,23 @@
       wrapper.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
     }
 
+    function centerMapOnPoint(x, y) {
+      const viewportRect = viewport.getBoundingClientRect();
+      scale = 3.5;
+
+      translateX = (viewportRect.width / 2) - (x * scale);
+      translateY = (viewportRect.height / 2) - (y * scale);
+      updateTransform();
+    }
+
+    function openGoogleMaps(lat, lng) {
+      if (!lat || !lng) {
+        alert('Coordenadas GPS não disponíveis.');
+        return;
+      }
+      window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+    }
+
     function setupPanAndZoom() {
       zoomInBtn.addEventListener('click', () => { scale *= 1.3; updateTransform(); });
       zoomOutBtn.addEventListener('click', () => { scale = Math.max(0.2, scale / 1.3); updateTransform(); });
@@ -2974,6 +3070,11 @@
           svgHolder.classList.add('hidden-pins');
         }
       });
+
+      gmapsBtn.addEventListener('click', () => {
+        const item = listData[selectedIndex];
+        if (item) openGoogleMaps(item.lat, item.lng);
+      });
     }
 
     function renderList() {
@@ -2983,7 +3084,6 @@
       listData.forEach((item, index) => {
         if (item.x !== null) doneCount++;
 
-        // Aplica o filtro da pesquisa
         if (filterQuery && !item.moradia.toLowerCase().includes(filterQuery)) {
           return;
         }
@@ -2993,12 +3093,28 @@
         
         div.innerHTML = `
           <span>${item.moradia}</span>
-          ${item.x !== null ? `<span class="coords-badge">X:${item.x} Y:${item.y}</span>` : ''}
+          <div class="item-right">
+            <a href="#" class="gmaps-link" title="Abrir no Google Maps">📍</a>
+            ${item.x !== null ? `<span class="coords-badge">X:${item.x} Y:${item.y}</span>` : ''}
+          </div>
         `;
 
-        div.addEventListener('click', () => {
+        div.addEventListener('click', (e) => {
+          if (e.target.classList.contains('gmaps-link')) {
+            e.stopPropagation();
+            openGoogleMaps(item.lat, item.lng);
+            return;
+          }
+
           selectedIndex = index;
           renderList();
+
+          if (item.x !== null && item.y !== null) {
+            centerMapOnPoint(item.x, item.y);
+            renderSearchPin(item);
+          } else {
+            removeSearchPin();
+          }
         });
 
         listContainer.appendChild(div);
@@ -3028,20 +3144,20 @@
         listData[selectedIndex].x = x;
         listData[selectedIndex].y = y;
 
-        renderPins();
-
         if (selectedIndex < listData.length - 1) {
           selectedIndex++;
         }
 
+        renderPins();
         renderList();
       });
     }
 
+    // Renderiza apenas os marcadores verdes normais
     function renderPins() {
       document.querySelectorAll('.pin').forEach(el => el.remove());
 
-      listData.forEach(item => {
+      listData.forEach((item) => {
         if (item.x !== null && item.y !== null) {
           const pin = document.createElement('div');
           pin.className = 'pin';
@@ -3056,6 +3172,37 @@
           svgHolder.appendChild(pin);
         }
       });
+    }
+
+    // Renderiza o marcador vermelho independente com o botão de fechar (X)
+    function renderSearchPin(item) {
+      removeSearchPin();
+
+      const searchPin = document.createElement('div');
+      searchPin.id = 'search-pin';
+      searchPin.className = 'search-pin';
+      searchPin.style.left = `${item.x}px`;
+      searchPin.style.top = `${item.y}px`;
+
+      const label = document.createElement('div');
+      label.className = 'search-pin-label';
+      label.innerHTML = `
+        <span>${item.moradia}</span>
+        <span class="close-pin-btn" title="Fechar marcador">×</span>
+      `;
+
+      label.querySelector('.close-pin-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeSearchPin();
+      });
+
+      searchPin.appendChild(label);
+      svgHolder.appendChild(searchPin);
+    }
+
+    function removeSearchPin() {
+      const existingPin = document.getElementById('search-pin');
+      if (existingPin) existingPin.remove();
     }
 
     function undo() {
