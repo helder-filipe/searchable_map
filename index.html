@@ -230,8 +230,13 @@
       100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
     }
 
-    /* Oculta apenas os marcadores verdes */
+    /* Oculta os marcadores verdes inteiros */
     .hidden-pins .pin {
+      display: none !important;
+    }
+
+    /* Oculta apenas as etiquetas de texto dos marcadores verdes */
+    .hidden-labels .pin-label {
       display: none !important;
     }
   </style>
@@ -246,7 +251,12 @@
     
     <label class="toggle-container">
       <input type="checkbox" id="toggle-pins" checked />
-      <span>Mostrar Marcadores Verdes</span>
+      <span>Mostrar Pontos Verdes</span>
+    </label>
+
+    <label class="toggle-container">
+      <input type="checkbox" id="toggle-labels" checked />
+      <span>Mostrar Etiquetas (Nomes)</span>
     </label>
 
     <button id="gmaps-btn" class="btn btn-gmaps" title="Ver moradia selecionada no Google Maps">Ver no Google Maps 📍</button>
@@ -2997,6 +3007,7 @@
     const gmapsBtn = document.getElementById('gmaps-btn');
     const searchBox = document.getElementById('search-box');
     const togglePinsBtn = document.getElementById('toggle-pins');
+    const toggleLabelsBtn = document.getElementById('toggle-labels');
 
     const zoomInBtn = document.getElementById('zoom-in');
     const zoomOutBtn = document.getElementById('zoom-out');
@@ -3118,6 +3129,14 @@
           svgHolder.classList.remove('hidden-pins');
         } else {
           svgHolder.classList.add('hidden-pins');
+        }
+      });
+
+      toggleLabelsBtn.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          svgHolder.classList.remove('hidden-labels');
+        } else {
+          svgHolder.classList.add('hidden-labels');
         }
       });
 
