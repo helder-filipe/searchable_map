@@ -140,7 +140,7 @@
       left: 0;
       transform-origin: 0 0;
       display: inline-block; 
-      transition: transform 0.2s ease-out;
+      transition: transform 0.1s ease-out;
     }
     
     svg { display: block; }
@@ -148,33 +148,36 @@
     /* Marcadores Verdes Padrão */
     .pin {
       position: absolute;
-      width: 2px;
-      height: 2px;
+      width: 4px;
+      height: 4px;
       background: #00ff66;
       border: 0.5px solid #000;
       border-radius: 50%;
       transform: translate(-50%, -50%);
-      pointer-events: none;
       z-index: 10;
+      cursor: pointer;
     }
 
     .pin-label {
       position: absolute;
-      left: 4px;
+      left: 6px;
       top: -4px;
       background: rgba(0,0,0,0.85);
       color: #00ff66;
-      font-size: 6px;
-      padding: 1px 2px;
+      font-size: 7px;
+      padding: 1px 3px;
       border-radius: 2px;
       white-space: nowrap;
+      user-select: text;
+      -webkit-user-select: text;
+      cursor: text;
     }
 
-    /* Marcador Vermelho de Destaque da Pesquisa (Pequeno e Independente) */
+    /* Marcador Vermelho de Destaque da Pesquisa */
     .search-pin {
       position: absolute;
-      width: 5px;
-      height: 5px;
+      width: 6px;
+      height: 6px;
       background: #ff0055;
       border: 1px solid #ffffff;
       border-radius: 50%;
@@ -182,11 +185,12 @@
       z-index: 999;
       box-shadow: 0 0 6px rgba(255, 0, 85, 0.9);
       animation: pulseOnce 1s ease-out 1 forwards;
+      cursor: pointer;
     }
 
     .search-pin-label {
       position: absolute;
-      left: 7px;
+      left: 8px;
       top: -7px;
       background: #ff0055;
       color: #ffffff;
@@ -199,6 +203,9 @@
       align-items: center;
       gap: 5px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+      user-select: text;
+      -webkit-user-select: text;
+      cursor: text;
     }
 
     .close-pin-btn {
@@ -209,6 +216,7 @@
       background: rgba(0, 0, 0, 0.3);
       padding: 1px 3px;
       border-radius: 50%;
+      user-select: none;
     }
 
     .close-pin-btn:hover {
@@ -691,10 +699,10 @@
       {id: "12 FV", lat:37.053271321, lng:-8.05178899},
       {id: "13A FV", lat:37.053725839, lng:-8.052652912},
       {id: "13B FV", lat:37.053782087, lng:-8.052589183},
-          {id: "2001 OC", lat:37.044414312, lng:-8.048333208},
+      {id: "2001 OC", lat:37.044414, lng:-8.047521},
       {id: "2003 OC", lat:37.044414312, lng:-8.048333208},
       {id: "2005/8 OC", lat:37.044041107, lng:-8.04952959},
-          {id: "2006 OC", lat:37.044414312, lng:-8.048333208},
+      {id: "2006 OC", lat:37.044213, lng:-8.048015},
       {id: "2007 OC", lat:37.044194339, lng:-8.048937711},
       {id: "2009/10 OC", lat:37.044401502, lng:-8.04976312},
       {id: "2011 OC", lat:37.044712033, lng:-8.050335872},
@@ -712,7 +720,7 @@
       {id: "2026 OC", lat:37.044356412, lng:-8.04700703},
       {id: "2027 OC", lat:37.044084775, lng:-8.046947654},
       {id: "2028 OC", lat:37.043887355, lng:-8.047054813},
-          {id: "2029 OC", lat:37.044414312, lng:-8.048333208},
+      {id: "2029 OC", lat:37.044106, lng:-8.047468},
       {id: "2030 OC", lat:37.043635817, lng:-8.047692302},
       {id: "2031 OC", lat:37.043517578, lng:-8.047902459},
       {id: "2032 OC", lat:37.043470479, lng:-8.048159951},
@@ -767,7 +775,7 @@
       {id: "2091 OC", lat:37.043612064, lng:-8.050679401},
       {id: "2092 OC", lat:37.043492312, lng:-8.050485015},
       {id: "2095 OC", lat:37.043267778, lng:-8.05100218},
-          {id: "2098 OC", lat:37.044414312, lng:-8.048333208},
+      {id: "2098 OC", lat:37.042894, lng:-8.050783},
       {id: "2099 OC", lat:37.042618799, lng:-8.050966585},
       {id: "2100 OC", lat:37.042695976, lng:-8.051220042},
       {id: "2101 OC", lat:37.042820898, lng:-8.051434452},
@@ -1088,18 +1096,18 @@
       {id: "1250 TRF", lat:37.062698, lng:-8.068664},
       {id: "1251 TRF", lat:37.062888, lng:-8.069227},
       {id: "1252 TRF", lat:37.063031, lng:-8.068894},
-          {id: "1253 TRF", lat:37.062694296, lng:-8.068641227},
-          {id: "1254 TRF", lat:37.062694296, lng:-8.068641227},
-          {id: "1255 TRF", lat:37.062694296, lng:-8.068641227},
-          {id: "1256 TRF", lat:37.062694296, lng:-8.068641227},
-          {id: "1257 TRF", lat:37.062694296, lng:-8.068641227},
-          {id: "1258 TRF", lat:37.062694296, lng:-8.068641227},
-          {id: "1259 TRF", lat:37.062694296, lng:-8.068641227},
-          {id: "1260 TRF", lat:37.062694296, lng:-8.068641227},
-          {id: "1261 TRF", lat:37.062694296, lng:-8.068641227},
-          {id: "1262 TRF", lat:37.062694296, lng:-8.068641227},
-          {id: "1263 TRF", lat:37.062694296, lng:-8.068641227},
-          {id: "1264 TRF", lat:37.062694296, lng:-8.068641227},
+      {id: "1253 TRF", lat:37.063183, lng:-8.069302},
+      {id: "1254 TRF", lat:37.063296, lng:-8.068964},
+      {id: "1255 TRF", lat:37.063482, lng:-8.069283},
+      {id: "1256 TRF", lat:37.063589, lng:-8.068875},
+      {id: "1257 TRF", lat:37.06372, lng:-8.069272},
+      {id: "1258 TRF", lat:37.06381, lng:-8.068918},
+      {id: "1259 TRF", lat:37.064011, lng:-8.069151},
+      {id: "1260 TRF", lat:37.064219, lng:-8.06914},
+      {id: "1261 TRF", lat:37.064281, lng:-8.068899},
+      {id: "1262 TRF", lat:37.064215, lng:-8.068676},
+      {id: "1263 TRF", lat:37.064007, lng:-8.068558},
+      {id: "1264 TRF", lat:37.063784, lng:-8.068504},
       {id: "1 VA", lat:37.054568054, lng:-8.049059883},
       {id: "2 VA", lat:37.054508693, lng:-8.048772579},
       {id: "3 VA", lat:37.054441418, lng:-8.048475066},
@@ -1739,7 +1747,7 @@
       {id: "492 VDL", lat:37.047827135, lng:-8.062491982},
       {id: "493 VDL", lat:37.047996778, lng:-8.062222738},
       {id: "495 VDL", lat:37.048848766, lng:-8.062295352},
-          {id: "496 VDL", lat:37.044414312, lng:-8.048333208},
+      {id: "496 VDL", lat:37.049065, lng:-8.061517},
       {id: "497 VDL", lat:37.049613751, lng:-8.061366511},
       {id: "498 VDL", lat:37.049916494, lng:-8.060823476},
       {id: "499 VDL", lat:37.050111811, lng:-8.060366924},
@@ -1812,7 +1820,7 @@
       {id: "569 VDL", lat:37.058031426, lng:-8.058505631},
       {id: "570 VDL", lat:37.058426361, lng:-8.058358526},
       {id: "571 VDL", lat:37.05906264, lng:-8.058155524},
-          {id: "572 VDL", lat:37.044414312, lng:-8.048333208},
+      {id: "572 VDL", lat:37.059385, lng:-8.058078},
       {id: "573 VDL", lat:37.059496996, lng:-8.058619339},
       {id: "574 VDL", lat:37.059157579, lng:-8.058741039},
       {id: "575 VDL", lat:37.058448672, lng:-8.058935082},
@@ -2201,7 +2209,7 @@
       {id: "841B VDL", lat:37.052893334, lng:-8.055522903},
       {id: "841C VDL", lat:37.052956447, lng:-8.055423191},
       {id: "841D VDL", lat:37.052923063, lng:-8.055412815},
-          {id: "842 VDL", lat:37.044414312, lng:-8.048333208},
+      {id: "842 VDL", lat:37.053655, lng:-8.055044},
       {id: "844A VDL", lat:37.053439371, lng:-8.054970806},
       {id: "844B VDL", lat:37.05341878, lng:-8.05496464},
       {id: "844C VDL", lat:37.053399592, lng:-8.054954885},
@@ -3038,6 +3046,20 @@
       wrapper.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
     }
 
+    function zoomAtPoint(factor, clientX, clientY) {
+      const viewportRect = viewport.getBoundingClientRect();
+      const pivotX = clientX !== undefined ? (clientX - viewportRect.left) : (viewportRect.width / 2);
+      const pivotY = clientY !== undefined ? (clientY - viewportRect.top) : (viewportRect.height / 2);
+
+      const newScale = Math.min(Math.max(0.2, scale * factor), 15);
+      
+      translateX = pivotX - (pivotX - translateX) * (newScale / scale);
+      translateY = pivotY - (pivotY - translateY) * (newScale / scale);
+      scale = newScale;
+
+      updateTransform();
+    }
+
     function centerMapOnPoint(x, y) {
       const viewportRect = viewport.getBoundingClientRect();
       scale = 3.5;
@@ -3056,12 +3078,18 @@
     }
 
     function setupPanAndZoom() {
-      zoomInBtn.addEventListener('click', () => { scale *= 1.3; updateTransform(); });
-      zoomOutBtn.addEventListener('click', () => { scale = Math.max(0.2, scale / 1.3); updateTransform(); });
+      zoomInBtn.addEventListener('click', () => zoomAtPoint(1.3));
+      zoomOutBtn.addEventListener('click', () => zoomAtPoint(1 / 1.3));
       zoomResetBtn.addEventListener('click', () => { scale = 1; translateX = 0; translateY = 0; updateTransform(); });
 
+      viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+        zoomAtPoint(factor, e.clientX, e.clientY);
+      }, { passive: false });
+
       viewport.addEventListener('mousedown', (e) => {
-        if (e.button !== 0) return;
+        if (e.button !== 0 || e.target.closest('.pin-label') || e.target.closest('.search-pin-label')) return;
         isDragging = true;
         hasDragged = false;
         startX = e.clientX - translateX;
@@ -3153,7 +3181,7 @@
       if (!svgEl) return;
 
       svgEl.addEventListener('click', (e) => {
-        if (hasDragged || selectedIndex >= listData.length) return;
+        if (hasDragged || e.target.closest('.pin') || e.target.closest('.search-pin') || selectedIndex >= listData.length) return;
 
         const pt = svgEl.createSVGPoint();
         pt.x = e.clientX;
@@ -3175,7 +3203,6 @@
       });
     }
 
-    // Renderiza apenas os marcadores verdes normais
     function renderPins() {
       document.querySelectorAll('.pin').forEach(el => el.remove());
 
@@ -3196,7 +3223,6 @@
       });
     }
 
-    // Renderiza o marcador vermelho independente com o botão de fechar (X)
     function renderSearchPin(item) {
       removeSearchPin();
 
