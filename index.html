@@ -22,6 +22,8 @@
     .btn-copy { background: #17a2b8; }
     .btn-import { background: #ffc107; color: #000; }
     .btn-undo { background: #dc3545; }
+    .btn-delete { background: #e67e22; }
+    .btn-delete:disabled { background: #555; opacity: 0.5; cursor: not-allowed; }
     .btn-gmaps { background: #ea4335; }
     .btn-zoom { background: #6c757d; width: 36px; text-align: center; }
 
@@ -59,9 +61,7 @@
       outline: none;
     }
 
-    .search-input:focus {
-      border-color: #004b87;
-    }
+    .search-input:focus { border-color: #004b87; }
 
     .list-container {
       flex-grow: 1;
@@ -130,9 +130,7 @@
       cursor: grab;
     }
     
-    #map-viewport:active {
-      cursor: grabbing;
-    }
+    #map-viewport:active { cursor: grabbing; }
 
     #svg-wrapper { 
       position: absolute; 
@@ -148,24 +146,39 @@
     /* Marcadores Verdes Padrão */
     .pin {
       position: absolute;
-      width: 4px;
-      height: 4px;
+      width: 6px;
+      height: 6px;
       background: #00ff66;
-      border: 0.5px solid #000;
+      border: 1px solid #000;
       border-radius: 50%;
       transform: translate(-50%, -50%);
       z-index: 10;
       cursor: pointer;
+      transition: transform 0.1s ease, background-color 0.1s ease;
+    }
+
+    .pin:hover {
+      transform: translate(-50%, -50%) scale(1.4);
+      background: #00ffff;
+      z-index: 20;
+    }
+
+    .pin.selected {
+      background: #00bfff;
+      border: 1.5px solid #ffffff;
+      box-shadow: 0 0 8px #00bfff;
+      z-index: 30;
+      transform: translate(-50%, -50%) scale(1.3);
     }
 
     .pin-label {
       position: absolute;
-      left: 6px;
+      left: 8px;
       top: -4px;
       background: rgba(0,0,0,0.85);
       color: #00ff66;
-      font-size: 7px;
-      padding: 1px 3px;
+      font-size: 8px;
+      padding: 1px 4px;
       border-radius: 2px;
       white-space: nowrap;
       user-select: text;
@@ -173,24 +186,30 @@
       cursor: text;
     }
 
+    .pin.selected .pin-label {
+      color: #00bfff;
+      font-weight: bold;
+      border: 1px solid #00bfff;
+    }
+
     /* Marcador Vermelho de Destaque da Pesquisa */
     .search-pin {
       position: absolute;
-      width: 6px;
-      height: 6px;
+      width: 8px;
+      height: 8px;
       background: #ff0055;
-      border: 1px solid #ffffff;
+      border: 1.5px solid #ffffff;
       border-radius: 50%;
       transform: translate(-50%, -50%);
       z-index: 999;
-      box-shadow: 0 0 6px rgba(255, 0, 85, 0.9);
+      box-shadow: 0 0 8px rgba(255, 0, 85, 0.9);
       animation: pulseOnce 1s ease-out 1 forwards;
       cursor: pointer;
     }
 
     .search-pin-label {
       position: absolute;
-      left: 8px;
+      left: 10px;
       top: -7px;
       background: #ff0055;
       color: #ffffff;
@@ -230,15 +249,8 @@
       100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
     }
 
-    /* Oculta os marcadores verdes inteiros */
-    .hidden-pins .pin {
-      display: none !important;
-    }
-
-    /* Oculta apenas as etiquetas de texto dos marcadores verdes */
-    .hidden-labels .pin-label {
-      display: none !important;
-    }
+    .hidden-pins .pin { display: none !important; }
+    .hidden-labels .pin-label { display: none !important; }
   </style>
 </head>
 <body>
@@ -259,6 +271,7 @@
       <span>Mostrar Etiquetas (Nomes)</span>
     </label>
 
+    <button id="delete-pin-btn" class="btn btn-delete" disabled title="Eliminar marcador selecionado (Delete)">Eliminar Marcador 🗑️</button>
     <button id="gmaps-btn" class="btn btn-gmaps" title="Ver moradia selecionada no Google Maps">Ver no Google Maps 📍</button>
     <button id="undo-btn" class="btn btn-undo">Desfazer (Ctrl+Z)</button>
     <button id="copy-btn" class="btn btn-copy">Exportar JSON</button>
@@ -282,7 +295,7 @@
   </div>
 
   <script>
-    const moradias = [
+   const moradias = [
       {id: "1 AF", lat:37.071628944, lng:-8.051208874},
       {id: "2 AF", lat:37.071461981, lng:-8.051097482},
       {id: "3 AF", lat:37.071289042, lng:-8.050963783},
@@ -3039,6 +3052,7 @@
     const importBtn = document.getElementById('import-btn');
     const fileInput = document.getElementById('file-input');
     const undoBtn = document.getElementById('undo-btn');
+    const deletePinBtn = document.getElementById('delete-pin-btn');
     const gmapsBtn = document.getElementById('gmaps-btn');
     const searchBox = document.getElementById('search-box');
     const togglePinsBtn = document.getElementById('toggle-pins');
@@ -3179,6 +3193,21 @@
         const item = listData[selectedIndex];
         if (item) openGoogleMaps(item.lat, item.lng);
       });
+
+      deletePinBtn.addEventListener('click', deleteSelectedPin);
+    }
+
+    function deleteSelectedPin() {
+      if (selectedIndex >= 0 && selectedIndex < listData.length) {
+        const item = listData[selectedIndex];
+        if (item.x !== null) {
+          item.x = null;
+          item.y = null;
+          removeSearchPin();
+          renderPins();
+          renderList();
+        }
+      }
     }
 
     function renderList() {
@@ -3212,6 +3241,7 @@
 
           selectedIndex = index;
           renderList();
+          renderPins();
 
           if (item.x !== null && item.y !== null) {
             centerMapOnPoint(item.x, item.y);
@@ -3228,6 +3258,9 @@
       if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
 
       progressStatus.innerText = `Progresso: ${doneCount} / ${listData.length} moradias mapeadas`;
+      
+      const currentItem = listData[selectedIndex];
+      deletePinBtn.disabled = !currentItem || currentItem.x === null;
     }
 
     function setupMapClick() {
@@ -3260,10 +3293,10 @@
     function renderPins() {
       document.querySelectorAll('.pin').forEach(el => el.remove());
 
-      listData.forEach((item) => {
+      listData.forEach((item, index) => {
         if (item.x !== null && item.y !== null) {
           const pin = document.createElement('div');
-          pin.className = 'pin';
+          pin.className = `pin ${index === selectedIndex ? 'selected' : ''}`;
           pin.style.left = `${item.x}px`;
           pin.style.top = `${item.y}px`;
 
@@ -3271,6 +3304,16 @@
           label.className = 'pin-label';
           label.innerText = item.moradia;
           pin.appendChild(label);
+
+          // Clique direto no marcador para o selecionar no mapa e na lista
+          pin.addEventListener('click', (e) => {
+            if (e.target.classList.contains('pin-label')) return; // Permite seleção de texto na etiqueta
+            e.stopPropagation();
+            selectedIndex = index;
+            renderList();
+            renderPins();
+            renderSearchPin(item);
+          });
 
           svgHolder.appendChild(pin);
         }
@@ -3322,7 +3365,11 @@
 
     undoBtn.addEventListener('click', undo);
     document.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') undo();
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        undo();
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && document.activeElement.tagName !== 'INPUT') {
+        deleteSelectedPin();
+      }
     });
 
     copyBtn.addEventListener('click', () => {
