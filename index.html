@@ -295,7 +295,7 @@
   </div>
 
   <script>
-   const moradias = [
+    const moradias = [
       {id: "1 AF", lat:37.071628944, lng:-8.051208874},
       {id: "2 AF", lat:37.071461981, lng:-8.051097482},
       {id: "3 AF", lat:37.071289042, lng:-8.050963783},
@@ -3254,8 +3254,11 @@
         listContainer.appendChild(div);
       });
 
+      // Rola a lista até que a moradia ativa/selecionada fique bem visível
       const activeEl = listContainer.querySelector('.moradia-item.active');
-      if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
 
       progressStatus.innerText = `Progresso: ${doneCount} / ${listData.length} moradias mapeadas`;
       
@@ -3305,14 +3308,21 @@
           label.innerText = item.moradia;
           pin.appendChild(label);
 
-          // Clique direto no marcador para o selecionar no mapa e na lista
+          // Ao clicar no marcador azul/verde no mapa:
           pin.addEventListener('click', (e) => {
-            if (e.target.classList.contains('pin-label')) return; // Permite seleção de texto na etiqueta
+            if (e.target.classList.contains('pin-label')) return; // Permite seleção de texto no rótulo
             e.stopPropagation();
+            
+            // Se houver um filtro de pesquisa ativo que oculte o item, limpa o filtro
+            if (filterQuery && !item.moradia.toLowerCase().includes(filterQuery)) {
+              searchBox.value = '';
+              filterQuery = '';
+            }
+
             selectedIndex = index;
-            renderList();
-            renderPins();
-            renderSearchPin(item);
+            renderList(); // Atualiza a lista lateral e rola a vista até ao item selecionado
+            renderPins(); // Destaca este ponto em azul
+            removeSearchPin(); // Remove destaque vermelho temporário
           });
 
           svgHolder.appendChild(pin);
