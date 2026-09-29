@@ -251,6 +251,14 @@
 
     .hidden-pins .pin { display: none !important; }
     .hidden-labels .pin-label { display: none !important; }
+    header { flex-wrap: wrap; }
+    #urban-panel { padding: 12px; border-bottom: 1px solid #555; overflow: auto; max-height: 55vh; }
+    #urban-panel h3 { margin: 0 0 10px; }
+    #urban-panel input[type=text], #urban-list { width: 100%; margin: 6px 0; padding: 8px; }
+    #urban-panel .actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    #urban-panel .btn:disabled { opacity: .45; cursor: not-allowed; }
+    #urban-help { font-size: 12px; line-height: 1.5; }
+    #svg-holder.urban-mode .pin, #svg-holder.urban-mode .search-pin { pointer-events: none; }
   </style>
 </head>
 <body>
@@ -282,6 +290,23 @@
 
   <div class="main-layout">
     <sidebar>
+      <section id="urban-panel" aria-label="Delimitação de urbanizações">
+        <h3>Urbanizações</h3>
+        <label><input id="urban-mode" type="checkbox"> Delimitar urbanizações</label>
+        <label><input id="urban-visible" type="checkbox" checked> Mostrar limites</label>
+        <select id="urban-list" aria-label="Urbanização selecionada"><option value="">Selecionar urbanização…</option></select>
+        <label>Nome<input id="urban-name" type="text" maxlength="120" placeholder="Nome da urbanização"></label>
+        <label>Cor <input id="urban-color" type="color" value="#ff9800"></label>
+        <div class="actions">
+          <button id="urban-new" class="btn">Nova área</button>
+          <button id="urban-edit" class="btn">Editar limites</button>
+          <button id="urban-save" class="btn">Guardar área</button>
+          <button id="urban-back" class="btn">Retirar ponto</button>
+          <button id="urban-cancel" class="btn">Cancelar</button>
+          <button id="urban-delete" class="btn btn-delete">Eliminar área</button>
+        </div>
+        <p id="urban-help" aria-live="polite">Ative o modo e escolha Nova área. Clique no mapa para marcar o contorno; arraste para deslocar o mapa. Guarde com pelo menos 3 pontos. Exporte o JSON para conservar o trabalho.</p>
+      </section>
       <h3>Moradias a Mapear</h3>
       <input type="text" id="search-box" class="search-input" placeholder="Pesquisar moradia (ex: VDL 8 A)..." />
       <div id="moradias-list" class="list-container"></div>
@@ -3081,6 +3106,129 @@
     }));
     
     let selectedIndex = 0;
+    let urbanizacoes = [];
+    let urbanDraft = null;
+    let urbanSelected = '';
+    let vertexDrag = null;
+    const urbanMode = document.getElementById('urban-mode');
+    const urbanList = document.getElementById('urban-list');
+    const urbanName = document.getElementById('urban-name');
+    const urbanColor = document.getElementById('urban-color');
+    const urbanHelp = document.getElementById('urban-help');
+    const ns = 'http://www.w3.org/2000/svg';
+
+    function svgNode(tag, attrs) {
+      const el = document.createElementNS(ns, tag);
+      Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+      return el;
+    }
+    function mapPoint(e) {
+      const svg = svgHolder.querySelector('svg');
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX; pt.y = e.clientY;
+      const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+      return {x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100};
+    }
+    function validPolygon(points) {
+      if (!Array.isArray(points) || points.length < 3 || points.some(p => !p || !Number.isFinite(p.x) || !Number.isFinite(p.y))) return false;
+      const area = points.reduce((sum, p, i) => { const q = points[(i + 1) % points.length]; return sum + p.x*q.y-q.x*p.y; }, 0);
+      return Math.abs(area) > 0.01;
+    }
+    function setUrbanMode() {
+      svgHolder.classList.toggle('urban-mode', urbanMode.checked);
+      deletePinBtn.disabled = urbanMode.checked || !listData[selectedIndex] || listData[selectedIndex].x === null;
+      renderUrbanAreas();
+    }
+    function renderUrbanAreas() {
+      const svg = svgHolder.querySelector('svg');
+      if (!svg) return;
+      svg.querySelector('#urban-overlay')?.remove();
+      const group = svgNode('g', {id: 'urban-overlay'});
+      svg.appendChild(group);
+      const show = document.getElementById('urban-visible').checked;
+      for (const area of urbanizacoes) {
+        if (!show || urbanDraft?.id === area.id) continue;
+        const polygon = svgNode('polygon', {points: area.points.map(p => `${p.x},${p.y}`).join(' '), fill: area.cor, 'fill-opacity': .18, stroke: area.cor, 'stroke-width': area.id === urbanSelected ? 4 : 2, 'vector-effect': 'non-scaling-stroke', 'pointer-events': 'none'});
+        group.appendChild(polygon);
+        const label = svgNode('text', {x: area.points[0].x, y: area.points[0].y, fill: area.cor, 'font-size': 14, 'paint-order': 'stroke', stroke: '#fff', 'stroke-width': 3, 'pointer-events': 'none'});
+        label.textContent = area.nome;
+        group.appendChild(label);
+      }
+      if (urbanDraft && urbanMode.checked) {
+        group.appendChild(svgNode('polyline', {points: urbanDraft.points.map(p => `${p.x},${p.y}`).join(' '), fill: urbanColor.value, 'fill-opacity': .15, stroke: urbanColor.value, 'stroke-width': 3, 'stroke-dasharray': '6 4', 'vector-effect': 'non-scaling-stroke', 'pointer-events': 'none'}));
+        urbanDraft.points.forEach((p, index) => {
+          const dot = svgNode('circle', {cx:p.x, cy:p.y, r:5 / scale, fill:'#fff', stroke:urbanColor.value, 'stroke-width':2, 'vector-effect':'non-scaling-stroke', class:'urban-vertex', cursor:'move'});
+          dot.addEventListener('mousedown', e => { e.stopPropagation(); vertexDrag = index; hasDragged = false; });
+          dot.addEventListener('click', e => e.stopPropagation());
+          group.appendChild(dot);
+        });
+      }
+      for (const id of ['save','back','cancel']) document.getElementById('urban-'+id).disabled = !urbanDraft;
+      for (const id of ['edit','delete']) document.getElementById('urban-'+id).disabled = !urbanSelected || !!urbanDraft;
+      document.getElementById('urban-new').disabled = !!urbanDraft;
+      urbanList.disabled = !!urbanDraft;
+      if (urbanDraft) urbanHelp.textContent = `${urbanDraft.points.length} pontos. Clique para acrescentar; arraste os pontos para ajustar. Guardar área fecha o contorno. Escape cancela.`;
+    }
+    function refreshUrbanList() {
+      urbanList.replaceChildren(new Option('Selecionar urbanização…', ''));
+      urbanizacoes.forEach(a => urbanList.add(new Option(a.nome, a.id)));
+      urbanList.value = urbanSelected;
+      renderUrbanAreas();
+    }
+    function cancelUrbanDraft() {
+      urbanDraft = null; vertexDrag = null;
+      urbanHelp.textContent = 'Selecione uma área para editar ou crie uma nova. Exporte o JSON para conservar o trabalho.';
+      renderUrbanAreas();
+    }
+    urbanMode.addEventListener('change', () => {
+      if (!urbanMode.checked && urbanDraft) {
+        if (!confirm('Descartar o contorno que está a editar?')) { urbanMode.checked = true; return; }
+        cancelUrbanDraft();
+      }
+      setUrbanMode();
+    });
+    document.getElementById('urban-visible').addEventListener('change', renderUrbanAreas);
+    urbanColor.addEventListener('input', renderUrbanAreas);
+    urbanList.addEventListener('change', () => {
+      urbanSelected = urbanList.value;
+      const area = urbanizacoes.find(a => a.id === urbanSelected);
+      if (area) { urbanName.value = area.nome; urbanColor.value = area.cor; }
+      renderUrbanAreas();
+    });
+    document.getElementById('urban-new').addEventListener('click', () => {
+      urbanMode.checked = true; urbanSelected = ''; urbanList.value = '';
+      urbanDraft = {id: crypto.randomUUID(), points: []};
+      urbanName.value = ''; setUrbanMode(); urbanName.focus();
+    });
+    document.getElementById('urban-edit').addEventListener('click', () => {
+      const area = urbanizacoes.find(a => a.id === urbanSelected);
+      if (!area) return;
+      urbanDraft = JSON.parse(JSON.stringify(area)); urbanMode.checked = true; setUrbanMode();
+    });
+    document.getElementById('urban-back').addEventListener('click', () => {
+      if (urbanDraft) { urbanDraft.points.pop(); renderUrbanAreas(); }
+    });
+    document.getElementById('urban-cancel').addEventListener('click', cancelUrbanDraft);
+    document.getElementById('urban-save').addEventListener('click', () => {
+      if (!urbanDraft) return;
+      if (!urbanName.value.trim()) return alert('Indique o nome da urbanização.');
+      if (!validPolygon(urbanDraft.points)) return alert('Marque pelo menos 3 pontos que formem uma área.');
+      const area = {...urbanDraft, nome: urbanName.value.trim(), cor: urbanColor.value};
+      const index = urbanizacoes.findIndex(a => a.id === area.id);
+      if (index < 0) urbanizacoes.push(area); else urbanizacoes[index] = area;
+      urbanSelected = area.id; cancelUrbanDraft(); refreshUrbanList();
+    });
+    document.getElementById('urban-delete').addEventListener('click', () => {
+      if (!urbanSelected || !confirm('Eliminar esta delimitação?')) return;
+      urbanizacoes = urbanizacoes.filter(a => a.id !== urbanSelected);
+      urbanSelected = ''; refreshUrbanList();
+    });
+    window.addEventListener('mousemove', e => {
+      if (vertexDrag === null || !urbanDraft) return;
+      urbanDraft.points[vertexDrag] = mapPoint(e); hasDragged = true; renderUrbanAreas();
+    });
+    window.addEventListener('mouseup', () => { vertexDrag = null; });
+
 
     async function init() {
       try {
@@ -3101,6 +3249,7 @@
       svgHolder.innerHTML = svgText;
 
       setupMapClick();
+      renderUrbanAreas();
     }
 
     function updateTransform() {
@@ -3119,6 +3268,7 @@
       scale = newScale;
 
       updateTransform();
+      renderUrbanAreas();
     }
 
     function centerMapOnPoint(x, y) {
@@ -3150,7 +3300,7 @@
       }, { passive: false });
 
       viewport.addEventListener('mousedown', (e) => {
-        if (e.button !== 0 || e.target.closest('.pin-label') || e.target.closest('.search-pin-label')) return;
+        if (e.button !== 0 || e.target.closest('.urban-vertex') || e.target.closest('.pin-label') || e.target.closest('.search-pin-label')) return;
         isDragging = true;
         hasDragged = false;
         startX = e.clientX - translateX;
@@ -3159,6 +3309,7 @@
 
       window.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
+        if (Math.hypot(e.clientX - startX - translateX, e.clientY - startY - translateY) < 4 && !hasDragged) return;
         hasDragged = true;
         translateX = e.clientX - startX;
         translateY = e.clientY - startY;
@@ -3199,6 +3350,7 @@
     }
 
     function deleteSelectedPin() {
+      if (urbanMode.checked) return;
       if (selectedIndex >= 0 && selectedIndex < listData.length) {
         const item = listData[selectedIndex];
         if (item.x !== null) {
@@ -3264,7 +3416,7 @@
       progressStatus.innerText = `Progresso: ${doneCount} / ${listData.length} moradias mapeadas`;
       
       const currentItem = listData[selectedIndex];
-      deletePinBtn.disabled = !currentItem || currentItem.x === null;
+      deletePinBtn.disabled = urbanMode.checked || !currentItem || currentItem.x === null;
     }
 
     function setupMapClick() {
@@ -3272,6 +3424,12 @@
       if (!svgEl) return;
 
       svgEl.addEventListener('click', (e) => {
+        if (urbanMode.checked) {
+          if (!hasDragged && urbanDraft && !e.target.closest('.urban-vertex')) {
+            urbanDraft.points.push(mapPoint(e)); renderUrbanAreas();
+          }
+          return;
+        }
         if (hasDragged || e.target.closest('.pin') || e.target.closest('.search-pin') || selectedIndex >= listData.length) return;
 
         const pt = svgEl.createSVGPoint();
@@ -3362,6 +3520,10 @@
     }
 
     function undo() {
+      if (urbanMode.checked) {
+        if (urbanDraft) { urbanDraft.points.pop(); renderUrbanAreas(); }
+        return;
+      }
       if (selectedIndex >= 0 && listData[selectedIndex].x !== null) {
         listData[selectedIndex].x = null;
         listData[selectedIndex].y = null;
@@ -3376,6 +3538,9 @@
 
     undoBtn.addEventListener('click', undo);
     document.addEventListener('keydown', (e) => {
+      if (e.target.matches('input, textarea, select') || e.target.isContentEditable) return;
+      if (e.key === 'Escape' && urbanDraft) { cancelUrbanDraft(); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') e.preventDefault();
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         undo();
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && document.activeElement.tagName !== 'INPUT') {
@@ -3385,17 +3550,21 @@
 
     copyBtn.addEventListener('click', () => {
       const mappedOnly = listData.filter(i => i.x !== null);
-      const jsonStr = JSON.stringify(mappedOnly, null, 2);
+      if (urbanDraft) return alert('Guarde ou cancele a área em edição antes de exportar.');
+      const svg = svgHolder.querySelector('svg');
+      const payload = {version: 2, mapa: {ficheiro: 'MAPA Infralobo.svg', sistemaCoordenadas: 'svg', viewBox: svg?.getAttribute('viewBox') || null}, moradias: mappedOnly, urbanizacoes};
+      const jsonStr = JSON.stringify(payload, null, 2);
       
-      navigator.clipboard.writeText(jsonStr);
+      navigator.clipboard?.writeText(jsonStr).catch(() => {});
       
       const blob = new Blob([jsonStr], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `progresso_moradias_${new Date().toISOString().slice(0,10)}.json`;
       a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       
-      alert(`Exportado progresso com ${mappedOnly.length} moradias!`);
+      alert(`Exportado progresso com ${mappedOnly.length} moradias e ${urbanizacoes.length} urbanizações!`);
     });
 
     importBtn.addEventListener('click', () => fileInput.click());
@@ -3409,7 +3578,20 @@
         try {
           const importedData = JSON.parse(event.target.result);
           
-          importedData.forEach(importedItem => {
+          if (urbanDraft) throw new Error('Guarde ou cancele a área em edição antes de importar.');
+          const legacy = Array.isArray(importedData);
+          const homes = legacy ? importedData : importedData.moradias;
+          const areas = legacy ? null : importedData.urbanizacoes;
+          if (!Array.isArray(homes) || (!legacy && (importedData.version !== 2 || !Array.isArray(areas) || importedData.mapa?.sistemaCoordenadas !== 'svg'))) throw new Error('Formato JSON não reconhecido.');
+          if (homes.some(h => !h || typeof (h.moradia || h.id) !== 'string' || !Number.isFinite(h.x) || !Number.isFinite(h.y))) throw new Error('Coordenadas de moradias inválidas.');
+          if (areas && (areas.some(a => !a || typeof a.id !== 'string' || !a.id || typeof a.nome !== 'string' || !a.nome.trim() || !/^#[0-9a-f]{6}$/i.test(a.cor) || !validPolygon(a.points)) || new Set(areas.map(a => a.id)).size !== areas.length)) throw new Error('Delimitações inválidas.');
+          if (areas && !confirm('Importar este projeto substitui as moradias mapeadas e as delimitações atuais. Continuar?')) return;
+          if (areas) {
+            listData.forEach(h => { h.x = null; h.y = null; });
+            urbanizacoes = areas.map(a => ({id:a.id, nome:a.nome, cor:a.cor, points:a.points.map(p => ({x:p.x,y:p.y}))}));
+            urbanSelected = ''; refreshUrbanList();
+          }
+          homes.forEach(importedItem => {
             const item = listData.find(d => d.moradia === (importedItem.moradia || importedItem.id));
             if (item) {
               item.x = importedItem.x;
@@ -3424,10 +3606,11 @@
           renderList();
           alert('Progresso importado com sucesso!');
         } catch (err) {
-          alert('Ficheiro JSON inválido.');
+          alert('Não foi possível importar: ' + err.message);
         }
       };
       reader.readAsText(file);
+      fileInput.value = '';
     });
 
     init();

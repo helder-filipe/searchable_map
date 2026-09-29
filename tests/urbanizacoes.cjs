@@ -1,0 +1,28 @@
+const {chromium}=require('playwright');
+const assert=require('assert');
+(async()=>{
+const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
+const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+await page.goto(process.env.MAP_TEST_URL || 'http://127.0.0.1:8765');await page.waitForSelector('#svg-holder svg');
+await page.click('#urban-new');await page.fill('#urban-name','Urbanização Teste');
+for(const [x,y] of [[700,400],[900,400],[850,650]])await page.mouse.click(x,y);
+assert.equal(await page.evaluate(()=>urbanDraft.points.length),3);
+assert.equal(await page.evaluate(()=>listData.filter(x=>x.x!==null).length),0);
+await page.click('#urban-save');assert.equal(await page.locator('#urban-overlay polygon').count(),1);
+await page.click('#urban-edit');
+const dot=page.locator('.urban-vertex').first();const box=await dot.boundingBox();
+await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+30,box.y+35);await page.mouse.up();
+await page.click('#urban-save');
+const downloadPromise=page.waitForEvent('download');await page.click('#copy-btn');const dl=await downloadPromise;await dl.saveAs('/tmp/map-roundtrip.json');
+const payload=JSON.parse(require('fs').readFileSync('/tmp/map-roundtrip.json'));assert.equal(payload.urbanizacoes.length,1);assert.equal(payload.mapa.sistemaCoordenadas,'svg');
+await page.click('#urban-delete');assert.equal(await page.locator('#urban-overlay polygon').count(),0);
+await page.setInputFiles('#file-input','/tmp/map-roundtrip.json');await page.waitForFunction(()=>urbanizacoes.length===1);
+assert.deepEqual(await page.evaluate(()=>urbanizacoes),payload.urbanizacoes);
+await page.setInputFiles('#file-input',{name:'legacy.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify([{moradia:'1 AF',x:123,y:456}]))});
+await page.waitForFunction(()=>listData[0].x===123);assert.equal(await page.evaluate(()=>urbanizacoes.length),1);
+await page.setInputFiles('#file-input',{name:'invalid.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({...payload,urbanizacoes:[{id:'bad',nome:'bad',cor:'#000000',points:[]}]}))});
+await page.waitForTimeout(100);assert.equal(await page.evaluate(()=>listData[0].x),123);assert.equal(await page.evaluate(()=>urbanizacoes.length),1);
+await page.screenshot({path:'/tmp/map-check.png'});assert.deepEqual(errors,[]);
+console.log('PASS: draw, edit vertex, save, export/import round-trip, legacy import, invalid import atomicity, no JS errors');await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});
