@@ -252,10 +252,21 @@
     .hidden-pins .pin { display: none !important; }
     .hidden-labels .pin-label { display: none !important; }
     header { flex-wrap: wrap; }
-    #urban-panel { padding: 12px; border-bottom: 1px solid #555; overflow: auto; max-height: 55vh; }
+    .main-layout { min-height: 0; }
+    header { flex-shrink: 0; }
+    sidebar { width: 410px; flex: 0 0 410px; min-height: 0; overflow-y: auto; }
+    sidebar > h3, sidebar > .search-input { flex-shrink: 0; }
+    #moradias-list { flex: 1 0 180px; min-height: 180px; overflow-y: auto; }
+    #urban-panel { flex: 0 0 auto; min-height: 430px; padding: 16px; border: 1px solid #555; border-radius: 8px; background: #1b2530; overflow: visible; }
+    #urban-panel > label { display: block; margin: 8px 0; }
+    #urban-panel .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #urban-panel .actions .btn { min-height: 40px; }
+    @media (max-width: 760px) {
+      sidebar { width: 340px; flex-basis: 340px; }
+    }
     #urban-panel h3 { margin: 0 0 10px; }
     #urban-panel input[type=text], #urban-list { width: 100%; margin: 6px 0; padding: 8px; }
-    #urban-panel .actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    #urban-panel .actions { gap: 8px; margin: 12px 0; }
     #urban-panel .btn:disabled { opacity: .45; cursor: not-allowed; }
     #urban-help { font-size: 12px; line-height: 1.5; }
     #svg-holder.urban-mode .pin, #svg-holder.urban-mode .search-pin { pointer-events: none; }
