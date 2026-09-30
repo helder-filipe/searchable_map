@@ -264,8 +264,12 @@
     @media (max-width: 760px) {
       sidebar { width: 340px; flex-basis: 340px; }
     }
+    #area-export { margin: 16px 0 8px; border: 1px solid #536577; border-radius: 6px; padding: 12px; }
+    #area-export label { display: block; margin: 8px 0; }
+    #area-export small { display: block; line-height: 1.5; color: #d1dbe5; }
+    #export-status { font-size: 12px; margin: 6px 0 0; }
     #urban-panel h3 { margin: 0 0 10px; }
-    #urban-panel input[type=text], #urban-list { width: 100%; margin: 6px 0; padding: 8px; }
+    #urban-panel input[type=text], #urban-panel select { width: 100%; margin: 6px 0; padding: 8px; }
     #urban-panel .actions { gap: 8px; margin: 12px 0; }
     #urban-panel .btn:disabled { opacity: .45; cursor: not-allowed; }
     #urban-help { font-size: 12px; line-height: 1.5; }
@@ -301,12 +305,15 @@
 
   <div class="main-layout">
     <sidebar>
-      <section id="urban-panel" aria-label="Delimitação de urbanizações">
-        <h3>Urbanizações</h3>
-        <label><input id="urban-mode" type="checkbox"> Delimitar urbanizações</label>
+      <section id="urban-panel" aria-label="Delimitação de urbanizações e zonas">
+        <h3>Urbanizações e zonas</h3>
+        <label><input id="urban-mode" type="checkbox"> Delimitar áreas</label>
         <label><input id="urban-visible" type="checkbox" checked> Mostrar limites</label>
-        <select id="urban-list" aria-label="Urbanização selecionada"><option value="">Selecionar urbanização…</option></select>
-        <label>Nome<input id="urban-name" type="text" maxlength="120" placeholder="Nome da urbanização"></label>
+        <select id="urban-list" aria-label="Área selecionada"><option value="">Selecionar área…</option></select>
+        <label>Tipo de área
+          <select id="area-type"><option value="urbanizacao">Urbanização</option><option value="zona">Zona</option></select>
+        </label>
+        <label>Nome<input id="urban-name" type="text" maxlength="120" placeholder="Nome da urbanização ou zona"></label>
         <label>Cor <input id="urban-color" type="color" value="#ff9800"></label>
         <div class="actions">
           <button id="urban-new" class="btn">Nova área</button>
@@ -316,6 +323,20 @@
           <button id="urban-cancel" class="btn">Cancelar</button>
           <button id="urban-delete" class="btn btn-delete">Eliminar área</button>
         </div>
+        <fieldset id="area-export">
+          <legend>Exportar a área selecionada</legend>
+          <label><input id="export-clip" type="checkbox" checked> Recortar pelo contorno</label>
+          <label><input id="export-white" type="checkbox"> Fundo branco (exterior à área)</label>
+          <label>Resolução PNG (lado maior)
+            <select id="export-size"><option value="2048">2048 px</option><option value="4096" selected>4096 px — alta resolução</option><option value="8192">8192 px — máxima resolução</option></select>
+          </label>
+          <div class="actions">
+            <button id="export-svg" class="btn btn-copy" disabled>Exportar SVG</button>
+            <button id="export-png" class="btn btn-copy" disabled>Exportar PNG</button>
+          </div>
+          <small>Guarde e selecione uma área. O SVG conserva os vetores; o PNG é gerado a partir do mapa original. O zoom do ecrã não afeta a qualidade.</small>
+          <p id="export-status" role="status"></p>
+        </fieldset>
         <p id="urban-help" aria-live="polite">Ative o modo e escolha Nova área. Clique no mapa para marcar o contorno; arraste para deslocar o mapa. Guarde com pelo menos 3 pontos. Exporte o JSON para conservar o trabalho.</p>
       </section>
       <h3>Moradias a Mapear</h3>
@@ -3117,13 +3138,15 @@
     }));
     
     let selectedIndex = 0;
-    let urbanizacoes = [];
+    let areasData = [];
     let urbanDraft = null;
     let urbanSelected = '';
     let vertexDrag = null;
     const urbanMode = document.getElementById('urban-mode');
     const urbanList = document.getElementById('urban-list');
     const urbanName = document.getElementById('urban-name');
+    const areaType = document.getElementById('area-type');
+    let exportingArea = false;
     const urbanColor = document.getElementById('urban-color');
     const urbanHelp = document.getElementById('urban-help');
     const ns = 'http://www.w3.org/2000/svg';
@@ -3157,7 +3180,7 @@
       const group = svgNode('g', {id: 'urban-overlay'});
       svg.appendChild(group);
       const show = document.getElementById('urban-visible').checked;
-      for (const area of urbanizacoes) {
+      for (const area of areasData) {
         if (!show || urbanDraft?.id === area.id) continue;
         const polygon = svgNode('polygon', {points: area.points.map(p => `${p.x},${p.y}`).join(' '), fill: area.cor, 'fill-opacity': .18, stroke: area.cor, 'stroke-width': area.id === urbanSelected ? 4 : 2, 'vector-effect': 'non-scaling-stroke', 'pointer-events': 'none'});
         group.appendChild(polygon);
@@ -3178,11 +3201,12 @@
       for (const id of ['edit','delete']) document.getElementById('urban-'+id).disabled = !urbanSelected || !!urbanDraft;
       document.getElementById('urban-new').disabled = !!urbanDraft;
       urbanList.disabled = !!urbanDraft;
+      for (const format of ['svg', 'png']) document.getElementById('export-'+format).disabled = !urbanSelected || !!urbanDraft || exportingArea;
       if (urbanDraft) urbanHelp.textContent = `${urbanDraft.points.length} pontos. Clique para acrescentar; arraste os pontos para ajustar. Guardar área fecha o contorno. Escape cancela.`;
     }
     function refreshUrbanList() {
-      urbanList.replaceChildren(new Option('Selecionar urbanização…', ''));
-      urbanizacoes.forEach(a => urbanList.add(new Option(a.nome, a.id)));
+      urbanList.replaceChildren(new Option('Selecionar área…', ''));
+      areasData.forEach(a => urbanList.add(new Option(`${a.tipo === 'zona' ? 'Zona' : 'Urbanização'} — ${a.nome}`, a.id)));
       urbanList.value = urbanSelected;
       renderUrbanAreas();
     }
@@ -3202,17 +3226,17 @@
     urbanColor.addEventListener('input', renderUrbanAreas);
     urbanList.addEventListener('change', () => {
       urbanSelected = urbanList.value;
-      const area = urbanizacoes.find(a => a.id === urbanSelected);
-      if (area) { urbanName.value = area.nome; urbanColor.value = area.cor; }
+      const area = areasData.find(a => a.id === urbanSelected);
+      if (area) { urbanName.value = area.nome; urbanColor.value = area.cor; areaType.value = area.tipo || 'urbanizacao'; }
       renderUrbanAreas();
     });
     document.getElementById('urban-new').addEventListener('click', () => {
       urbanMode.checked = true; urbanSelected = ''; urbanList.value = '';
-      urbanDraft = {id: crypto.randomUUID(), points: []};
+      urbanDraft = {id: crypto.randomUUID(), tipo: areaType.value, points: []};
       urbanName.value = ''; setUrbanMode(); urbanName.focus();
     });
     document.getElementById('urban-edit').addEventListener('click', () => {
-      const area = urbanizacoes.find(a => a.id === urbanSelected);
+      const area = areasData.find(a => a.id === urbanSelected);
       if (!area) return;
       urbanDraft = JSON.parse(JSON.stringify(area)); urbanMode.checked = true; setUrbanMode();
     });
@@ -3222,16 +3246,16 @@
     document.getElementById('urban-cancel').addEventListener('click', cancelUrbanDraft);
     document.getElementById('urban-save').addEventListener('click', () => {
       if (!urbanDraft) return;
-      if (!urbanName.value.trim()) return alert('Indique o nome da urbanização.');
+      if (!urbanName.value.trim()) return alert('Indique o nome da área.');
       if (!validPolygon(urbanDraft.points)) return alert('Marque pelo menos 3 pontos que formem uma área.');
-      const area = {...urbanDraft, nome: urbanName.value.trim(), cor: urbanColor.value};
-      const index = urbanizacoes.findIndex(a => a.id === area.id);
-      if (index < 0) urbanizacoes.push(area); else urbanizacoes[index] = area;
+      const area = {...urbanDraft, tipo: areaType.value, nome: urbanName.value.trim(), cor: urbanColor.value};
+      const index = areasData.findIndex(a => a.id === area.id);
+      if (index < 0) areasData.push(area); else areasData[index] = area;
       urbanSelected = area.id; cancelUrbanDraft(); refreshUrbanList();
     });
     document.getElementById('urban-delete').addEventListener('click', () => {
       if (!urbanSelected || !confirm('Eliminar esta delimitação?')) return;
-      urbanizacoes = urbanizacoes.filter(a => a.id !== urbanSelected);
+      areasData = areasData.filter(a => a.id !== urbanSelected);
       urbanSelected = ''; refreshUrbanList();
     });
     window.addEventListener('mousemove', e => {
@@ -3240,6 +3264,110 @@
     });
     window.addEventListener('mouseup', () => { vertexDrag = null; });
 
+
+
+    function selectedArea() {
+      const area = areasData.find(a => a.id === urbanSelected);
+      if (!area || urbanDraft) throw new Error('Guarde e selecione uma área antes de exportar.');
+      return area;
+    }
+    function areaExportBounds(points) {
+      const xs = points.map(p => p.x), ys = points.map(p => p.y);
+      const x = Math.min(...xs), y = Math.min(...ys);
+      const width = Math.max(...xs) - x, height = Math.max(...ys) - y;
+      if (!(width > 0 && height > 0)) throw new Error('O contorno não tem dimensões válidas.');
+      const padding = Math.max(width, height) * 0.003;
+      return {x: x-padding, y: y-padding, width: width+2*padding, height: height+2*padding};
+    }
+    function buildAreaSVG(area, clip, white) {
+      const source = svgHolder.querySelector('svg');
+      if (!source) throw new Error('O mapa ainda não está carregado.');
+      const bounds = areaExportBounds(area.points);
+      const root = source.cloneNode(true);
+      root.querySelector('#urban-overlay')?.remove();
+      root.removeAttribute('id'); root.removeAttribute('class'); root.removeAttribute('style');
+      root.setAttribute('xmlns', ns);
+      root.setAttribute('viewBox', `${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`);
+      root.setAttribute('width', bounds.width); root.setAttribute('height', bounds.height);
+      root.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      const title = svgNode('title', {}); title.textContent = area.nome; root.prepend(title);
+      const contents = svgNode('g', {});
+      for (const child of Array.from(root.children)) {
+        if (!['defs', 'style', 'title', 'desc'].includes(child.localName)) contents.appendChild(child);
+      }
+      root.appendChild(contents);
+      const points = area.points.map(p => `${p.x},${p.y}`).join(' ');
+      if (clip) {
+        const id = 'area-export-' + crypto.randomUUID();
+        const defs = svgNode('defs', {});
+        const clipPath = svgNode('clipPath', {id, clipPathUnits: 'userSpaceOnUse'});
+        clipPath.appendChild(svgNode('polygon', {points})); defs.appendChild(clipPath);
+        root.appendChild(defs); contents.setAttribute('clip-path', `url(#${id})`);
+      }
+      if (white) {
+        const bg = svgNode('rect', {x:bounds.x, y:bounds.y, width:bounds.width, height:bounds.height, fill:'#ffffff'});
+        root.insertBefore(bg, contents);
+      }
+      // An explicit width in SVG units preserves the boundary at every export resolution.
+      root.appendChild(svgNode('polygon', {points, fill:'none', stroke:area.cor, 'stroke-width':Math.max(bounds.width,bounds.height)/1000, 'stroke-linejoin':'round'}));
+      // Avoid silently producing exports that depend on network resources.
+      for (const img of root.querySelectorAll('image')) {
+        const href = img.getAttribute('href') || img.getAttributeNS('http://www.w3.org/1999/xlink','href') || '';
+        if (href && !href.startsWith('data:') && !href.startsWith('#')) throw new Error('O mapa contém imagens externas. Incorpore-as no SVG antes de exportar.');
+      }
+      return {root, bounds};
+    }
+    function downloadAreaBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }
+    function pngDimensions(bounds, requested) {
+      // Limit canvas memory to 32 megapixels while preserving aspect ratio.
+      const factor = Math.min(requested / Math.max(bounds.width,bounds.height), Math.sqrt(32000000 / (bounds.width*bounds.height)));
+      return {width:Math.max(1, Math.floor(bounds.width*factor + 1e-7)), height:Math.max(1, Math.floor(bounds.height*factor + 1e-7))};
+    }
+    async function exportArea(format) {
+      const status = document.getElementById('export-status');
+      let imageURL = null, canvas = null;
+      try {
+        const area = selectedArea();
+        exportingArea = true; renderUrbanAreas();
+        status.textContent = 'A preparar a exportação…';
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const {root, bounds} = buildAreaSVG(area, document.getElementById('export-clip').checked, document.getElementById('export-white').checked);
+        const filename = `${area.tipo === 'zona' ? 'zona' : 'urbanizacao'}-${area.nome.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9_-]+/gi,'-').replace(/^-|-$/g,'') || 'area'}`;
+        if (format === 'svg') {
+          const xml = new XMLSerializer().serializeToString(root);
+          downloadAreaBlob(new Blob([xml], {type:'image/svg+xml;charset=utf-8'}), filename+'.svg');
+          status.textContent = 'SVG exportado com vetores e imagens incorporadas originais.';
+          return;
+        }
+        const size = pngDimensions(bounds, Number(document.getElementById('export-size').value));
+        root.setAttribute('width', size.width); root.setAttribute('height', size.height);
+        imageURL = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(root)], {type:'image/svg+xml;charset=utf-8'}));
+        const img = new Image();
+        await new Promise((resolve,reject) => { img.onload = resolve; img.onerror = () => reject(new Error('Não foi possível converter o mapa. Tente exportar em SVG.')); img.src = imageURL; });
+        canvas = document.createElement('canvas'); canvas.width = size.width; canvas.height = size.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Memória insuficiente. Experimente uma resolução inferior.');
+        ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, size.width, size.height);
+        const blob = await new Promise(resolve => canvas.toBlob(resolve,'image/png'));
+        if (!blob) throw new Error('Não foi possível criar o PNG. Experimente uma resolução inferior.');
+        downloadAreaBlob(blob,filename+'.png');
+        status.textContent = `PNG exportado: ${size.width} × ${size.height} px. Fundo exterior ${document.getElementById('export-white').checked ? 'branco' : 'transparente'}.`;
+      } catch (err) {
+        status.textContent = 'Erro: ' + err.message;
+      } finally {
+        if (imageURL) URL.revokeObjectURL(imageURL);
+        if (canvas) { canvas.width = 0; canvas.height = 0; }
+        exportingArea = false; renderUrbanAreas();
+      }
+    }
+    document.getElementById('export-svg').addEventListener('click', () => exportArea('svg'));
+    document.getElementById('export-png').addEventListener('click', () => exportArea('png'));
 
     async function init() {
       try {
@@ -3563,7 +3691,7 @@
       const mappedOnly = listData.filter(i => i.x !== null);
       if (urbanDraft) return alert('Guarde ou cancele a área em edição antes de exportar.');
       const svg = svgHolder.querySelector('svg');
-      const payload = {version: 2, mapa: {ficheiro: 'MAPA Infralobo.svg', sistemaCoordenadas: 'svg', viewBox: svg?.getAttribute('viewBox') || null}, moradias: mappedOnly, urbanizacoes};
+      const payload = {version: 3, mapa: {ficheiro: 'MAPA Infralobo.svg', sistemaCoordenadas: 'svg', viewBox: svg?.getAttribute('viewBox') || null}, moradias: mappedOnly, urbanizacoes: areasData.filter(a => a.tipo !== 'zona'), zonas: areasData.filter(a => a.tipo === 'zona')};
       const jsonStr = JSON.stringify(payload, null, 2);
       
       navigator.clipboard?.writeText(jsonStr).catch(() => {});
@@ -3575,7 +3703,7 @@
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       
-      alert(`Exportado progresso com ${mappedOnly.length} moradias e ${urbanizacoes.length} urbanizações!`);
+      alert(`Exportado progresso com ${mappedOnly.length} moradias e ${areasData.filter(a => a.tipo !== 'zona').length} urbanizações e ${areasData.filter(a => a.tipo === 'zona').length} zonas!`);
     });
 
     importBtn.addEventListener('click', () => fileInput.click());
@@ -3592,14 +3720,19 @@
           if (urbanDraft) throw new Error('Guarde ou cancele a área em edição antes de importar.');
           const legacy = Array.isArray(importedData);
           const homes = legacy ? importedData : importedData.moradias;
-          const areas = legacy ? null : importedData.urbanizacoes;
-          if (!Array.isArray(homes) || (!legacy && (importedData.version !== 2 || !Array.isArray(areas) || importedData.mapa?.sistemaCoordenadas !== 'svg'))) throw new Error('Formato JSON não reconhecido.');
+          const supported = !legacy && (importedData?.version === 2 || importedData?.version === 3);
+          if (!legacy && (!supported || !Array.isArray(importedData.urbanizacoes) || (importedData.version === 3 && !Array.isArray(importedData.zonas)))) throw new Error('Formato de áreas não reconhecido.');
+          const areas = legacy ? null : [
+            ...importedData.urbanizacoes.map(a => ({...a, tipo: 'urbanizacao'})),
+            ...(importedData.version === 3 ? importedData.zonas.map(a => ({...a, tipo: 'zona'})) : [])
+          ];
+          if (!Array.isArray(homes) || (!legacy && (!supported || !Array.isArray(areas) || importedData.mapa?.sistemaCoordenadas !== 'svg'))) throw new Error('Formato JSON não reconhecido.');
           if (homes.some(h => !h || typeof (h.moradia || h.id) !== 'string' || !Number.isFinite(h.x) || !Number.isFinite(h.y))) throw new Error('Coordenadas de moradias inválidas.');
           if (areas && (areas.some(a => !a || typeof a.id !== 'string' || !a.id || typeof a.nome !== 'string' || !a.nome.trim() || !/^#[0-9a-f]{6}$/i.test(a.cor) || !validPolygon(a.points)) || new Set(areas.map(a => a.id)).size !== areas.length)) throw new Error('Delimitações inválidas.');
           if (areas && !confirm('Importar este projeto substitui as moradias mapeadas e as delimitações atuais. Continuar?')) return;
           if (areas) {
             listData.forEach(h => { h.x = null; h.y = null; });
-            urbanizacoes = areas.map(a => ({id:a.id, nome:a.nome, cor:a.cor, points:a.points.map(p => ({x:p.x,y:p.y}))}));
+            areasData = areas.map(a => ({id:a.id, tipo:a.tipo, nome:a.nome, cor:a.cor, points:a.points.map(p => ({x:p.x,y:p.y}))}));
             urbanSelected = ''; refreshUrbanList();
           }
           homes.forEach(importedItem => {
