@@ -3173,6 +3173,20 @@
       deletePinBtn.disabled = urbanMode.checked || !listData[selectedIndex] || listData[selectedIndex].x === null;
       renderUrbanAreas();
     }
+    // Compensate the full screen transform, including zoom on the HTML wrapper.
+    function updateAreaStrokeWidths() {
+      const svg = svgHolder.querySelector('svg');
+      const matrix = svg?.getScreenCTM();
+      if (!matrix) return;
+      const screenScale = Math.hypot(matrix.a, matrix.b);
+      if (!(screenScale > 0)) return;
+      svg.querySelectorAll('#urban-overlay [data-screen-stroke]').forEach(el => {
+        el.setAttribute('stroke-width', Number(el.dataset.screenStroke) / screenScale);
+        if (el.dataset.screenRadius) el.setAttribute('r', Number(el.dataset.screenRadius) / screenScale);
+        if (el.dataset.screenDash) el.setAttribute('stroke-dasharray', el.dataset.screenDash.split(' ').map(v => Number(v) / screenScale).join(' '));
+      });
+    }
+
     function renderUrbanAreas() {
       const svg = svgHolder.querySelector('svg');
       if (!svg) return;
@@ -3182,16 +3196,16 @@
       const show = document.getElementById('urban-visible').checked;
       for (const area of areasData) {
         if (!show || urbanDraft?.id === area.id) continue;
-        const polygon = svgNode('polygon', {points: area.points.map(p => `${p.x},${p.y}`).join(' '), fill: area.cor, 'fill-opacity': .18, stroke: area.cor, 'stroke-width': area.id === urbanSelected ? 4 : 2, 'vector-effect': 'non-scaling-stroke', 'pointer-events': 'none'});
+        const polygon = svgNode('polygon', {points: area.points.map(p => `${p.x},${p.y}`).join(' '), fill: area.cor, 'fill-opacity': .18, stroke: area.cor, 'data-screen-stroke': area.id === urbanSelected ? 1.5 : 1, 'pointer-events': 'none'});
         group.appendChild(polygon);
         const label = svgNode('text', {x: area.points[0].x, y: area.points[0].y, fill: area.cor, 'font-size': 14, 'paint-order': 'stroke', stroke: '#fff', 'stroke-width': 3, 'pointer-events': 'none'});
         label.textContent = area.nome;
         group.appendChild(label);
       }
       if (urbanDraft && urbanMode.checked) {
-        group.appendChild(svgNode('polyline', {points: urbanDraft.points.map(p => `${p.x},${p.y}`).join(' '), fill: urbanColor.value, 'fill-opacity': .15, stroke: urbanColor.value, 'stroke-width': 3, 'stroke-dasharray': '6 4', 'vector-effect': 'non-scaling-stroke', 'pointer-events': 'none'}));
+        group.appendChild(svgNode('polyline', {points: urbanDraft.points.map(p => `${p.x},${p.y}`).join(' '), fill: urbanColor.value, 'fill-opacity': .15, stroke: urbanColor.value, 'data-screen-stroke': 1.25, 'data-screen-dash': '6 4', 'pointer-events': 'none'}));
         urbanDraft.points.forEach((p, index) => {
-          const dot = svgNode('circle', {cx:p.x, cy:p.y, r:5 / scale, fill:'#fff', stroke:urbanColor.value, 'stroke-width':2, 'vector-effect':'non-scaling-stroke', class:'urban-vertex', cursor:'move'});
+          const dot = svgNode('circle', {cx:p.x, cy:p.y, 'data-screen-radius':5, fill:'#fff', stroke:urbanColor.value, 'data-screen-stroke':1, class:'urban-vertex', cursor:'move'});
           dot.addEventListener('mousedown', e => { e.stopPropagation(); vertexDrag = index; hasDragged = false; });
           dot.addEventListener('click', e => e.stopPropagation());
           group.appendChild(dot);
@@ -3200,6 +3214,7 @@
       for (const id of ['save','back','cancel']) document.getElementById('urban-'+id).disabled = !urbanDraft;
       for (const id of ['edit','delete']) document.getElementById('urban-'+id).disabled = !urbanSelected || !!urbanDraft;
       document.getElementById('urban-new').disabled = !!urbanDraft;
+      updateAreaStrokeWidths();
       urbanList.disabled = !!urbanDraft;
       for (const format of ['svg', 'png']) document.getElementById('export-'+format).disabled = !urbanSelected || !!urbanDraft || exportingArea;
       if (urbanDraft) urbanHelp.textContent = `${urbanDraft.points.length} pontos. Clique para acrescentar; arraste os pontos para ajustar. Guardar área fecha o contorno. Escape cancela.`;
@@ -3393,6 +3408,7 @@
 
     function updateTransform() {
       wrapper.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+      updateAreaStrokeWidths();
     }
 
     function zoomAtPoint(factor, clientX, clientY) {
